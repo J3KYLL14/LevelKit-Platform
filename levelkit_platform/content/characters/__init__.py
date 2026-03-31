@@ -1,0 +1,1 @@
+"""Student-editable character definitions."""
