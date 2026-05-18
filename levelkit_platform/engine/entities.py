@@ -27,6 +27,8 @@ class Actor:
     attack: dict = field(default_factory=dict)
     dialogue_id: str | None = None
     ai: dict = field(default_factory=dict)
+    sprite: str | None = None
+    animations: dict = field(default_factory=dict)
     state: AnimationState = field(default_factory=AnimationState)
 
     def __post_init__(self):
@@ -56,6 +58,7 @@ class Pickup:
     rect: pygame.Rect
     color: tuple[int, int, int]
     data: dict
+    sprite: str | None = None
 
 
 @dataclass
@@ -65,3 +68,7 @@ class NPC:
     color: tuple[int, int, int]
     dialogue_id: str
     name: str
+    sprite: str | None = None
+    animations: dict = field(default_factory=dict)
+    facing: int = 1
+    state: AnimationState = field(default_factory=AnimationState)

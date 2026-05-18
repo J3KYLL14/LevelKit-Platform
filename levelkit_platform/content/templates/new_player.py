@@ -2,8 +2,8 @@ from levelkit import player
 
 
 CHARACTER = player(
-    "Student Knight",
-    id="student_knight",
+    "My Hero",
+    id="my_hero",
     health=5,
     speed="normal",
     jump="normal",

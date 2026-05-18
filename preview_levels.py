@@ -1,7 +1,19 @@
 from pathlib import Path
 
-import pygame
+try:
+    import pygame
+except ModuleNotFoundError as exc:
+    if exc.name == "pygame":
+        raise SystemExit(
+            "LevelKit Platform requires pygame, and pygame is not installed for this Python interpreter.\n"
+            "Install it once for the Python you want to use, then run previews with that same Python:\n"
+            "  python3 -m pip install -r requirements.txt\n"
+            "  python3 preview_levels.py\n"
+            "A virtual environment is optional; LevelKit does not require one."
+        ) from exc
+    raise
 
+from levelkit_platform.engine.assets import AssetLibrary
 from levelkit_platform.engine.content_loader import load_definitions, load_levels
 from levelkit_platform.engine.errors import PlainEnglishError
 
@@ -44,7 +56,11 @@ def draw_label(surface, font, text, pos, color=(245, 245, 245)):
     surface.blit(label, pos)
 
 
-def render_level(level_def, character_defs, item_defs, font):
+def draw_sprite_or_rect(assets, surface, rect, color, sprite_path=None, border_radius=0):
+    assets.draw_sprite_or_rect(surface, rect, color, sprite_path, border_radius=border_radius)
+
+
+def render_level(level_def, character_defs, item_defs, font, assets):
     world_width, world_height = level_def["world_size"]
     draw_width = PREVIEW_WIDTH - (PADDING * 2)
     draw_height = PREVIEW_HEIGHT - (PADDING * 2)
@@ -58,22 +74,49 @@ def render_level(level_def, character_defs, item_defs, font):
     pygame.draw.rect(surface, (235, 235, 235), world_rect, width=2)
 
     for solid in level_def.get("solids", []):
-        pygame.draw.rect(surface, COLORS["solid"], scale_rect(solid, scale_x, scale_y), border_radius=3)
+        draw_sprite_or_rect(
+            assets,
+            surface,
+            scale_rect(solid, scale_x, scale_y),
+            COLORS["solid"],
+            solid.get("sprite"),
+            border_radius=3,
+        )
 
     for hazard in level_def.get("hazards", []):
-        pygame.draw.rect(surface, COLORS["hazard"], scale_rect(hazard, scale_x, scale_y), border_radius=3)
+        draw_sprite_or_rect(
+            assets,
+            surface,
+            scale_rect(hazard, scale_x, scale_y),
+            COLORS["hazard"],
+            hazard.get("sprite"),
+            border_radius=3,
+        )
 
     for exit_zone in level_def.get("exits", []):
         rect = scale_rect(exit_zone, scale_x, scale_y)
-        pygame.draw.rect(surface, COLORS["exit"], rect, width=3, border_radius=3)
+        if exit_zone.get("sprite"):
+            draw_sprite_or_rect(assets, surface, rect, COLORS["exit"], exit_zone.get("sprite"))
+        else:
+            pygame.draw.rect(surface, COLORS["exit"], rect, width=3, border_radius=3)
         draw_label(surface, font, f"Exit -> {exit_zone['target_level']}", (rect.x, max(8, rect.y - 20)))
 
     for checkpoint in level_def.get("checkpoints", []):
-        pygame.draw.rect(surface, COLORS["checkpoint"], scale_rect(checkpoint, scale_x, scale_y), border_radius=3)
+        draw_sprite_or_rect(
+            assets,
+            surface,
+            scale_rect(checkpoint, scale_x, scale_y),
+            COLORS["checkpoint"],
+            checkpoint.get("sprite"),
+            border_radius=3,
+        )
 
     for win_zone in level_def.get("win_zones", []):
         rect = scale_rect(win_zone, scale_x, scale_y)
-        pygame.draw.rect(surface, COLORS["win_zone"], rect, width=4, border_radius=3)
+        if win_zone.get("sprite"):
+            draw_sprite_or_rect(assets, surface, rect, COLORS["win_zone"], win_zone.get("sprite"))
+        else:
+            pygame.draw.rect(surface, COLORS["win_zone"], rect, width=4, border_radius=3)
         draw_label(surface, font, "Win", (rect.x, max(8, rect.y - 20)))
 
     for spawn_id, spawn in level_def.get("spawns", {}).items():
@@ -89,7 +132,7 @@ def render_level(level_def, character_defs, item_defs, font):
             max(4, int(item["size"][0] * scale_x)),
             max(4, int(item["size"][1] * scale_y)),
         )
-        pygame.draw.rect(surface, item["color"], rect, border_radius=5)
+        draw_sprite_or_rect(assets, surface, rect, item["color"], placement.get("sprite") or item.get("sprite"), border_radius=5)
         draw_label(surface, font, item["id"], (rect.x + 14, rect.y - 2))
 
     for placement in level_def.get("enemies", []):
@@ -100,7 +143,14 @@ def render_level(level_def, character_defs, item_defs, font):
             max(6, int(character["size"][0] * scale_x)),
             max(6, int(character["size"][1] * scale_y)),
         )
-        pygame.draw.rect(surface, character["color"], rect, border_radius=6)
+        draw_sprite_or_rect(
+            assets,
+            surface,
+            rect,
+            character["color"],
+            placement.get("sprite") or character.get("sprite"),
+            border_radius=6,
+        )
         draw_label(surface, font, placement["character_id"], (rect.x + 10, rect.y - 2))
 
     for placement in level_def.get("npcs", []):
@@ -111,7 +161,14 @@ def render_level(level_def, character_defs, item_defs, font):
             max(6, int(character["size"][0] * scale_x)),
             max(6, int(character["size"][1] * scale_y)),
         )
-        pygame.draw.rect(surface, character["color"], rect, border_radius=6)
+        draw_sprite_or_rect(
+            assets,
+            surface,
+            rect,
+            character["color"],
+            placement.get("sprite") or character.get("sprite"),
+            border_radius=6,
+        )
         draw_label(surface, font, placement["character_id"], (rect.x + 10, rect.y - 2))
 
     draw_label(surface, pygame.font.SysFont(None, 38), level_def["name"], (PADDING, 10))
@@ -140,12 +197,14 @@ def main():
     pygame.font.init()
     OUTPUT_DIR.mkdir(exist_ok=True)
     font = pygame.font.SysFont(None, 22)
+    assets = AssetLibrary()
+    assets.init()
     levels, _ = load_levels()
     character_defs = load_definitions("characters", "CHARACTER")
     item_defs = load_definitions("items", "ITEMS")
 
     for level_id, level_def in levels.items():
-        surface = render_level(level_def, character_defs, item_defs, font)
+        surface = render_level(level_def, character_defs, item_defs, font, assets)
         output_path = OUTPUT_DIR / f"{level_id}.png"
         pygame.image.save(surface, output_path)
         print(f"Saved {output_path}")

@@ -12,6 +12,7 @@ class ExitZone:
     rect: pygame.Rect
     target_level: str
     target_spawn: str
+    sprite: str | None = None
 
 
 @dataclass
@@ -22,10 +23,14 @@ class LevelState:
     world_size: tuple[int, int]
     player_spawn: dict
     solids: list[pygame.Rect]
+    solid_sprites: list[str | None]
     hazards: list[pygame.Rect]
+    hazard_sprites: list[str | None]
     exits: list[ExitZone]
     checkpoints: list[pygame.Rect]
+    checkpoint_sprites: list[str | None]
     win_zones: list[pygame.Rect]
+    win_zone_sprites: list[str | None]
     pickups: list[Pickup]
     enemies: list[Actor]
     npcs: list[NPC]
@@ -33,6 +38,10 @@ class LevelState:
 
 def make_rect(data):
     return pygame.Rect(data["x"], data["y"], data["w"], data["h"])
+
+
+def make_sprite_list(level_def, key):
+    return [item.get("sprite") for item in level_def.get(key, [])]
 
 
 def build_actor(defn, spawn):
@@ -49,6 +58,8 @@ def build_actor(defn, spawn):
         attack=dict(defn.get("attack", {})),
         dialogue_id=defn.get("dialogue_id"),
         ai=dict(defn.get("ai", {})),
+        sprite=spawn.get("sprite") or defn.get("sprite"),
+        animations=dict(defn.get("animations", {})),
     )
 
 
@@ -60,6 +71,7 @@ def build_level(level_def, character_defs, item_defs):
             rect=make_rect(exit_data),
             target_level=exit_data["target_level"],
             target_spawn=exit_data.get("target_spawn", "default"),
+            sprite=exit_data.get("sprite"),
         )
         for exit_data in level_def.get("exits", [])
     ]
@@ -80,6 +92,7 @@ def build_level(level_def, character_defs, item_defs):
                 ),
                 color=tuple(item["color"]),
                 data=item,
+                sprite=placement.get("sprite") or item.get("sprite"),
             )
         )
 
@@ -102,6 +115,8 @@ def build_level(level_def, character_defs, item_defs):
                 color=tuple(char_def["color"]),
                 dialogue_id=char_def["dialogue_id"],
                 name=char_def["name"],
+                sprite=placement.get("sprite") or char_def.get("sprite"),
+                animations=dict(char_def.get("animations", {})),
             )
         )
 
@@ -112,10 +127,14 @@ def build_level(level_def, character_defs, item_defs):
         world_size=tuple(level_def["world_size"]),
         player_spawn=level_def["spawns"],
         solids=solids,
+        solid_sprites=make_sprite_list(level_def, "solids"),
         hazards=hazards,
+        hazard_sprites=make_sprite_list(level_def, "hazards"),
         exits=exits,
         checkpoints=checkpoints,
+        checkpoint_sprites=make_sprite_list(level_def, "checkpoints"),
         win_zones=win_zones,
+        win_zone_sprites=make_sprite_list(level_def, "win_zones"),
         pickups=pickups,
         enemies=enemies,
         npcs=npcs,
